@@ -1,13 +1,18 @@
 package toki
 
+import (
+	"strings"
+)
+
 type JsonWebToken struct {
-	TokenAlgorithm *Algorithm // Specifies the algorithm used by the token
+	Payload        *Claims    // The contents of the claims segment defined in JWT
 	String         string     // Contains the full JWT object as a string
+	TokenAlgorithm *Algorithm // Specifies the algorithm used by the token
 }
 
 func NewJsonWebToken() *JsonWebToken {
 	return &JsonWebToken{
-		TokenAlgorithm: HS256, // Use the HS256 algorithm by default
+		TokenAlgorithm: HS256(), // Use the HS256 algorithm by default
 	}
 }
 
@@ -15,11 +20,11 @@ func NewJsonWebToken() *JsonWebToken {
 // generates a JWT/JWE compliant JOSE header. Function returns a pointer to a the
 // toki Header type offering additional encoding options.
 func (jwt *JsonWebToken) GenerateHeader() *Header {
-	var header = &Header
+	var header Header
 
 	// When the TokenAlgorithm doesn't specify Crypto it means you have a JWT.
 	// When crypto is present then you have a JWE enabled token
-	if jwt.TokenAlgorithm.Crypto == nil {
+	if jwt.TokenAlgorithm.Crypto.Available() {
 		header.Typ = "JWT"
 		header.Alg = jwt.TokenAlgorithm.Name
 	} else {
@@ -27,7 +32,7 @@ func (jwt *JsonWebToken) GenerateHeader() *Header {
 		header.Alg = jwt.TokenAlgorithm.Name
 	}
 
-	return header
+	return &header
 }
 
 // StripBase64Padding strips the base64 padding char (=) from the provided content string.
