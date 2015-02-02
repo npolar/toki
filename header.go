@@ -27,5 +27,5 @@ func (header *Header) JsonHeader() ([]byte, error) {
 // See (header *Header)JsonHeader for details on the json encoding.
 func (header *Header) Base64Header() (string, error) {
 	headerJson, err := header.JsonHeader()
-	return base64.URLEncoding.EncodeToString(headerJson), err
+	return strings.TrimRight(base64.URLEncoding.EncodeToString(headerJson), "="), err
 }
