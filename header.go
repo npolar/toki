@@ -3,7 +3,6 @@ package toki
 import (
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"strings"
 )
 
@@ -25,7 +24,9 @@ func (header *Header) JsonHeader() ([]byte, error) {
 
 // Base64Header generates a URLencoded base64 string from the JsonHeader.
 // See (header *Header)JsonHeader for details on the json encoding.
+// See token.go for RemoveBase64Padding(string) details.
 func (header *Header) Base64Header() (string, error) {
 	headerJson, err := header.JsonHeader()
-	return strings.TrimRight(base64.URLEncoding.EncodeToString(headerJson), "="), err
+	encodedString := base64.URLEncoding.EncodeToString(headerJson)
+	return StripBase64Padding(encodedString), err
 }
