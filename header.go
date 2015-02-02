@@ -3,7 +3,6 @@ package toki
 import (
 	"encoding/base64"
 	"encoding/json"
-	"strings"
 )
 
 // Define a new struct for the JWT JOSE header. field definitions can be found here:
