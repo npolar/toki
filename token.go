@@ -59,7 +59,7 @@ func (jwt *JsonWebToken) String() (string, error) {
 		return content + "." + jwt.Signature, err
 	} else {
 		// Optionally set the header to unsecure and don't use a secret to sign!
-		return "", errors.New("Token is missing a signature! Sign the token before calling string")
+		return "", errors.New("Missing signature! Sign the token before calling string")
 	}
 }
 
