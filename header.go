@@ -9,11 +9,11 @@ import (
 // Define a new struct for the JWT JOSE header. field definitions can be found here:
 // https://tools.ietf.org/html/draft-ietf-jose-json-web-encryption-40#section-4.1
 type Header struct {
-	Typ string `json:"typ,omitempty"` // Token Type [Determined by the algorithm]
-	Alg string `json:"alg,omitempty"` // Token Alg [Determined by the algorithm]
-	Enc string `json:"enc,omitempty"` // Token Encryption [Determined by the algorithm]
-	Zip string `json:"zip,omitempty"` // Compression used on the token
-	Kid string `json:"kid,omitempty"` // Unique token ID
+	Typ string `json:"typ,omitempty"` // Token Type [Determined by the algorithm] - OPTIONAL
+	Alg string `json:"alg,omitempty"` // Token Alg [Determined by the algorithm] - REQUIRED
+	Enc string `json:"enc,omitempty"` // Token Encryption [Determined by the algorithm] - OPTIONAL
+	Zip string `json:"zip,omitempty"` // Compression used on the token - OPTIONAL
+	Kid string `json:"kid,omitempty"` // Unique token ID - OPTIONAL
 }
 
 // NewHeader creates a header object with the default algorithm settings
