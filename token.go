@@ -1,7 +1,9 @@
 package toki
 
 import (
+	"encoding/base64"
 	"errors"
+	"regexp"
 	"strings"
 )
 
@@ -25,26 +27,47 @@ func NewJsonWebToken() *JsonWebToken {
 func (jwt *JsonWebToken) UpdateTokenHeader() {
 	// When the TokenAlgorithm specifies crypto we have a JWE token.
 	if jwt.TokenAlgorithm.CryptoHash.Available() {
-		jwt.Jose.TokenType = "JWE"
-		jwt.Jose.Algorithm = jwt.TokenAlgorithm.Name
+		jwt.Jose.Typ = "JWE"
+		jwt.Jose.Alg = jwt.TokenAlgorithm.Name
 	} else {
-		jwt.Jose.TokenType = "JWT"
-		jwt.Jose.Algorithm = jwt.TokenAlgorithm.Name
+		jwt.Jose.Typ = "JWT"
+		jwt.Jose.Alg = jwt.TokenAlgorithm.Name
+	}
+}
+
+// JoseClaimString joins the base64 of the Jose header and claim with a dot
+func (jwt *JsonWebToken) JoseClaimString() (string, error) {
+	encodedClaims, err := jwt.Claim.Base64()
+	encodedHeader, err := jwt.Jose.Base64()
+
+	// If one of both generates an error return a blank string with the error.
+	// Since the err var is re-used the last error will bleed through first.
+	if err != nil {
+		return "", err
+	}
+
+	return encodedHeader + "." + encodedClaims, err
+}
+
+func (jwt *JsonWebToken) CalculateSignature(secret string) (string, error) {
+	jwt.UpdateTokenHeader() // Update the header to match any overriden values
+
+	if content, err := jwt.JoseClaimString(); err == nil {
+		base64Hmac := jwt.TokenAlgorithm.Base64Hmac(secret, content)
+		return StripBase64Padding(base64Hmac), nil
+	} else {
+		return "", err
 	}
 }
 
 // Sign uses the tokens header and claims contents to generate a signature for the token.
 func (jwt *JsonWebToken) Sign(secret string) error {
-	jwt.UpdateTokenHeader() // Update the header to match any overriden values
-
-	if content, err := jwt.JoseClaimString(); err == nil {
-		base64Hmac := jwt.TokenAlgorithm.Base64Hmac(secret, content)
-		jwt.Signature = StripBase64Padding(base64Hmac)
+	if signature, err := jwt.CalculateSignature(secret); err == nil {
+		jwt.Signature = StripBase64Padding(signature)
+		return nil
 	} else {
 		return err
 	}
-
-	return nil
 }
 
 // String combines Content String and the result from a S returns the full JWT string
@@ -63,22 +86,82 @@ func (jwt *JsonWebToken) String() (string, error) {
 	}
 }
 
-// JoseClaimString joins the base64 of the Jose header and claim with a dot
-func (jwt *JsonWebToken) JoseClaimString() (string, error) {
-	encodedClaims, err := jwt.Claim.Base64()
-	encodedHeader, err := jwt.Jose.Base64()
+// Parse is used to decode and split an externally provided token.
+// Token contents will then be loaded in the relevant attributes and
+// can be used for validation purposes
+func (jwt *JsonWebToken) Parse(token string) error {
+	if jwt.ValidTokenString(token) {
+		var jose, claim string
+		var err error
 
-	// If one of both generates an error return a blank string with the error.
-	// Since the err var is re-used the last error will bleed through first.
-	if err != nil {
-		return "", err
+		// Split the string into the respective parts
+		tokenSegments := strings.Split(token, ".")
+
+		if jose, err = DecodeNonPaddedBase64(tokenSegments[0]); err != nil {
+			return err
+		}
+
+		if err := jwt.Jose.Parse(jose); err != nil {
+			return err
+		}
+
+		if claim, err = DecodeNonPaddedBase64(tokenSegments[1]); err != nil {
+			return err
+		}
+
+		if err := jwt.Claim.Parse(claim); err != nil {
+			return err
+		}
+
+		jwt.Signature = tokenSegments[2]
+
+		return nil
+	} else {
+		return errors.New("Invalid token format! Input: " + token)
 	}
+}
 
-	return encodedHeader + "." + encodedClaims, err
+// @TODO figure out secret recovery. Should be a mechanism based on the token content and/or memcache obj
+func (jwt *JsonWebToken) Valid(secret string) (bool, error) {
+	if signature, err := jwt.CalculateSignature(secret); err == nil {
+		if jwt.Signature == signature {
+			return true, nil
+		} else {
+			val, _ := jwt.JoseClaimString()
+			return false, errors.New("[Invalid Token] Signature mismatch. Input: " + jwt.Signature + " Checksum: " + signature + " TokenContents: " + val)
+		}
+	} else {
+		return false, err
+	}
+}
+
+// ValidTokenString checks if the full token string follows the spec.
+// Checks if the token uses URLEncodedBase64 (http://tools.ietf.org/html/rfc4648#section-5)
+// and doesn't use any base64 padding tokens (=) at the end of the segments
+func (jwt *JsonWebToken) ValidTokenString(token string) bool {
+	tokenRxp := regexp.MustCompile("^[a-zA-Z0-9-_]+\\.[a-zA-Z0-9-_]+\\.[a-zA-Z0-9-_]+$")
+	return tokenRxp.MatchString(token)
 }
 
 // StripBase64Padding strips the base64 padding char (=) from the provided content string.
 // This function is provided because JWTs don't allow padding chars in the token body.
 func StripBase64Padding(content string) string {
 	return strings.TrimRight(content, "=")
+}
+
+func DecodeNonPaddedBase64(base64String string) (string, error) {
+	// Check if the string has the propper length. If not we add the required padding
+	base64String = PadBase64(base64String)
+
+	content, err := base64.URLEncoding.DecodeString(base64String)
+	return string(content), err
+}
+
+func PadBase64(nonPaddedBase64 string) string {
+	if remainder := len(nonPaddedBase64) % 4; remainder != 0 {
+		nonPaddedBase64 = nonPaddedBase64 + "="
+		nonPaddedBase64 = PadBase64(nonPaddedBase64)
+	}
+
+	return nonPaddedBase64
 }
