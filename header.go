@@ -3,22 +3,24 @@ package toki
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 )
 
 // Define a new struct for the JWT JOSE header. field definitions can be found here:
 // https://tools.ietf.org/html/draft-ietf-jose-json-web-encryption-40#section-4.1
 type Header struct {
-	TokenType   string `json:"typ,omitempty"` // Private: Determined by the algorithm (not settable from outside)
-	Algorithm   string `json:"alg,omitempty"` // Private: Determined by the algorithm (not settable from outside)
-	Encryption  string `json:"enc,omitempty"` // Private: Determined by the algorithm (not settable from outside)
-	Compression string `json:"zip,omitempty"`
-	KeyId       string `json:"kid,omitempty"`
+	Typ string `json:"typ,omitempty"` // Token Type [Determined by the algorithm]
+	Alg string `json:"alg,omitempty"` // Token Alg [Determined by the algorithm]
+	Enc string `json:"enc,omitempty"` // Token Encryption [Determined by the algorithm]
+	Zip string `json:"zip,omitempty"` // Compression used on the token
+	Kid string `json:"kid,omitempty"` // Unique token ID
 }
 
+// NewHeader creates a header object with the default algorithm settings
 func NewHeader() *Header {
 	return &Header{
-		TokenType: "JWT",
-		Algorithm: "HS256",
+		Typ: "JWT",
+		Alg: "HS256",
 	}
 }
 
@@ -35,3 +37,43 @@ func (header *Header) Base64() (string, error) {
 	encodedString := base64.URLEncoding.EncodeToString(headerJson)
 	return StripBase64Padding(encodedString), err
 }
+
+func (header *Header) Parse(jose string) error {
+	var decoded Header
+
+	if err := json.Unmarshal([]byte(jose), &decoded); err != nil {
+		return err
+	}
+
+	if err := decoded.Valid(); err != nil {
+		return err
+	}
+
+	header = &decoded
+
+	return nil
+}
+
+func (header *Header) Valid() error {
+	if header.Alg == "" {
+		return errors.New("[Invalid Jose Header] Missing required field: alg")
+	}
+
+	return nil
+}
+
+// @TODO Add checks for the supported types so we can bail on corrupted header contents
+//func (header *Header) ValidType(typ string) bool {
+//
+//}
+//
+//func (header *Header) ValidAlg(alg string) bool {
+//
+//}
+//
+//// ValidEncryption checks if the encryption name
+//// matches one of the types defined by the JWA spec
+//// https://tools.ietf.org/html/draft-ietf-jose-json-web-algorithms-40#section-5
+//func (header *Header) ValidEncryption(enc string) bool {
+//
+//}
