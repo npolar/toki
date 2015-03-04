@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+// @TODO add a JoseClaim string attr for signing of externally generated json
 type JsonWebToken struct {
 	Jose           *Header    // Info @ toki/header.go
 	Claim          *Claims    // Info @ toki/claims.go
@@ -101,15 +102,18 @@ func (jwt *JsonWebToken) Parse(token string) error {
 			return err
 		}
 
-		if err := jwt.Jose.Parse(jose); err != nil {
+		if err = jwt.Jose.Parse(jose); err != nil {
 			return err
 		}
+
+		// User the parsed header info to set the TokenAlgoritm
+		jwt.DetermineTokenAlgorithm()
 
 		if claim, err = DecodeNonPaddedBase64(tokenSegments[1]); err != nil {
 			return err
 		}
 
-		if err := jwt.Claim.Parse(claim); err != nil {
+		if err = jwt.Claim.Parse(claim); err != nil {
 			return err
 		}
 
@@ -127,11 +131,21 @@ func (jwt *JsonWebToken) Valid(secret string) (bool, error) {
 		if jwt.Signature == signature {
 			return true, nil
 		} else {
-			val, _ := jwt.JoseClaimString()
-			return false, errors.New("[Invalid Token] Signature mismatch. Input: " + jwt.Signature + " Checksum: " + signature + " TokenContents: " + val)
+			return false, errors.New("[Invalid Token] Signature mismatch.")
 		}
 	} else {
 		return false, err
+	}
+}
+
+func (jwt *JsonWebToken) DetermineTokenAlgorithm() {
+	switch jwt.Jose.Alg {
+	case "HS256":
+		jwt.TokenAlgorithm = HS256()
+	case "HS384":
+		jwt.TokenAlgorithm = HS384()
+	case "HS512":
+		jwt.TokenAlgorithm = HS512()
 	}
 }
 
