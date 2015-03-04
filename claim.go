@@ -15,10 +15,8 @@ type Claims struct {
 
 // NewClaims initializes the claims struct.
 func NewClaims() *Claims {
-	var defaults = make(map[string]interface{})
-	defaults["iat"] = time.Now().UTC().Unix()
 	return &Claims{
-		Content: defaults,
+		Content: make(map[string]interface{}),
 	}
 }
 
@@ -45,5 +43,38 @@ func (claims *Claims) Parse(claim string) error {
 
 	claims.Content = raw
 
+	// @TODO wrap validation checks in a validator
+	if expired, err := claims.TokenExpired(); expired {
+		return err
+	}
+
+	if active, err := claims.TokenActive(); !active {
+		return err
+	}
+
 	return nil // Everything is OK!
+}
+
+func (claims *Claims) TokenExpired() (bool, error) {
+	if claims.Content["exp"] != nil {
+		expiredTime, _ := claims.Content["exp"].(json.Number).Int64()
+		now := time.Now().UTC().Unix()
+
+		if expiredTime < now {
+			return true, errors.New("[Invalid token] Token has expired!")
+		}
+	}
+	return false, nil
+}
+
+func (claims *Claims) TokenActive() (bool, error) {
+	if claims.Content["nbf"] != nil {
+		activationTime, _ := claims.Content["nbf"].(json.Number).Int64()
+		now := time.Now().UTC().Unix()
+
+		if activationTime > now {
+			return false, errors.New("[Invalid token] Token not usable before: " + time.Unix(activationTime, 0).String())
+		}
+	}
+	return true, nil
 }
