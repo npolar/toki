@@ -14,6 +14,12 @@ type Algorithm struct {
 
 // Define the supported SHA2 Algorithms used in the JWS
 
+func NoAlg() *Algorithm {
+	return &Algorithm{
+		Name: "none",
+	}
+}
+
 func HS256() *Algorithm {
 	return &Algorithm{
 		Name:          "HS256",
