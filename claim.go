@@ -32,6 +32,7 @@ func (claims *Claims) Base64() (string, error) {
 	return StripBase64Padding(base64String), err
 }
 
+// Parse decodes the json in the claims body into the Claims.Content
 func (claims *Claims) Parse(claim string) error {
 	var raw = make(map[string]interface{})
 	decoder := json.NewDecoder(bytes.NewBufferString(claim))
@@ -55,6 +56,7 @@ func (claims *Claims) Parse(claim string) error {
 	return nil // Everything is OK!
 }
 
+// TokenExpired evaluates the exp value in the claim and returns true if the token has expired
 func (claims *Claims) TokenExpired() (bool, error) {
 	if claims.Content["exp"] != nil {
 		expiredTime, _ := claims.Content["exp"].(json.Number).Int64()
@@ -67,6 +69,7 @@ func (claims *Claims) TokenExpired() (bool, error) {
 	return false, nil
 }
 
+// TokenActive evaluates the nbf (not before) value and returns true if the token is usable
 func (claims *Claims) TokenActive() (bool, error) {
 	if claims.Content["nbf"] != nil {
 		activationTime, _ := claims.Content["nbf"].(json.Number).Int64()
