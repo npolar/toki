@@ -53,6 +53,10 @@ func (jwt *JsonWebToken) JoseClaimString() (string, error) {
 func (jwt *JsonWebToken) CalculateSignature(secret string) (string, error) {
 	jwt.UpdateTokenHeader() // Update the header to match any overriden values
 
+	if jwt.TokenAlgorithm.Name == "none" {
+		return "", nil
+	}
+
 	if content, err := jwt.JoseClaimString(); err == nil {
 		base64Hmac := jwt.TokenAlgorithm.Base64Hmac(secret, content)
 		return StripBase64Padding(base64Hmac), nil
@@ -73,18 +77,13 @@ func (jwt *JsonWebToken) Sign(secret string) error {
 
 // String combines Content String and the result from a S returns the full JWT string
 func (jwt *JsonWebToken) String() (string, error) {
-	if jwt.Signature != "" {
-		content, err := jwt.JoseClaimString()
+	content, err := jwt.JoseClaimString()
 
-		if err != nil {
-			return "", err
-		}
-
-		return content + "." + jwt.Signature, err
-	} else {
-		// Optionally set the header to unsecure and don't use a secret to sign!
-		return "", errors.New("Missing signature! Sign the token before calling string")
+	if err != nil {
+		return "", err
 	}
+
+	return content + "." + jwt.Signature, err
 }
 
 // Parse is used to decode and split an externally provided token.
@@ -140,6 +139,8 @@ func (jwt *JsonWebToken) Valid(secret string) (bool, error) {
 
 func (jwt *JsonWebToken) DetermineTokenAlgorithm() {
 	switch jwt.Jose.Alg {
+	case "none":
+		jwt.TokenAlgorithm = NoAlg()
 	case "HS256":
 		jwt.TokenAlgorithm = HS256()
 	case "HS384":
